@@ -22,10 +22,16 @@ function requiredParameter(name: string) {
 }
 
 function Studio() {
-  const [scope] = React.useState(() => ({
-    workspaceId: requiredParameter("workspaceId"),
-    sessionId: requiredParameter("sessionId"),
-  }));
+  const [scope] = React.useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const page = params.get("page");
+    const pageValue = page === null ? NaN : Number(page);
+    return {
+      workspaceId: requiredParameter("workspaceId"),
+      sessionId: requiredParameter("sessionId"),
+      initialDeckPage: Number.isInteger(pageValue) && pageValue >= 0 ? pageValue : null,
+    };
+  });
 
   return (
     <main className="h-dvh min-h-0 overflow-hidden bg-background text-foreground">
@@ -33,6 +39,7 @@ function Studio() {
         sessionId={scope.sessionId}
         client={deepSeekDesignStudioClient}
         workspaceId={scope.workspaceId}
+        initialDeckPage={scope.initialDeckPage ?? undefined}
         expanded
         features={{
           publish: false,

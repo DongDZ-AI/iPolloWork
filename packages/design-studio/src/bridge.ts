@@ -14,6 +14,11 @@ export type DesignStudioHostMessage =
     channel: typeof DESIGN_STUDIO_HOST_CHANNEL;
     type: "ask-document-ai";
     currentPage?: string;
+  }
+  | {
+    channel: typeof DESIGN_STUDIO_HOST_CHANNEL;
+    type: "deck-changed";
+    page: number;
   };
 
 export function designStudioAskAiRequest(
@@ -28,6 +33,9 @@ export function isDesignStudioHostMessage(value: unknown): value is DesignStudio
   if (Reflect.get(value, "channel") !== DESIGN_STUDIO_HOST_CHANNEL) return false;
   const type = Reflect.get(value, "type");
   if (type === "ask-document-ai") return true;
+  if (type === "deck-changed") {
+    return typeof Reflect.get(value, "page") === "number";
+  }
   if (type !== "ask-ai") return false;
   const request = Reflect.get(value, "request");
   if (!request || typeof request !== "object") return false;

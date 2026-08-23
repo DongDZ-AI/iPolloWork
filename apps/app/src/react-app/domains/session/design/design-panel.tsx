@@ -8,6 +8,7 @@ import {
   type DesignAiSelectionContext,
   type DesignStudioClient,
   type DesignStudioFeatures,
+  DESIGN_STUDIO_HOST_CHANNEL,
 } from "@ipollowork/design-studio";
 import { pickLocalImageFile, readLocalImageAsDataUrl } from "@/app/lib/desktop";
 import { downloadBlobAsFile } from "@/app/lib/download";
@@ -127,6 +128,7 @@ type DesignPanelProps = {
   workspaceId: string | null;
   isRemoteWorkspace?: boolean;
   initialPath?: string;
+  initialDeckPage?: number;
   expanded?: boolean;
   features?: DesignStudioFeatures;
   branding?: {
@@ -542,6 +544,7 @@ export function DesignPanel({
   workspaceId,
   isRemoteWorkspace = false,
   initialPath,
+  initialDeckPage,
   expanded = false,
   features = IPOLLOWORK_DESIGN_STUDIO_FEATURES,
   branding,
@@ -612,6 +615,7 @@ export function DesignPanel({
   };
   const frameViewRef = React.useRef({ scrollX: 0, scrollY: 0 });
   const pendingViewRestoreRef = React.useRef<DesignViewRestore | null>(null);
+  const initialDeckPageAppliedRef = React.useRef(false);
   const hydratedPageRef = React.useRef("");
   const [selectionState, setSelectionState] = React.useState<DesignSelectionChange | null>(null);
   const selectionSummary = selectionState
@@ -993,10 +997,18 @@ export function DesignPanel({
       }
       if (event.data.type === "deck") {
         const pending = pendingViewRestoreRef.current;
-        if (!acceptsDesignDeckMessage(pending, { index: event.data.deck.index, viewRevision: event.data.viewRevision })) return;
+        const deckIndex = event.data.deck.index;
+        if (!acceptsDesignDeckMessage(pending, { index: deckIndex, viewRevision: event.data.viewRevision })) return;
         deckRef.current = event.data.deck;
         setDeck(event.data.deck);
-        if (pending && pending.deckIndex === event.data.deck.index) {
+        // Report the active slide to the host so a subsequent view remount can
+        // restore the same page when the studio iframe is rebuilt.
+        window.parent.postMessage({
+          channel: DESIGN_STUDIO_HOST_CHANNEL,
+          type: "deck-changed",
+          page: deckIndex,
+        }, window.location.origin);
+        if (pending && pending.deckIndex === deckIndex) {
           pending.deckRestored = true;
           if (pending.frameRestored) {
             const locator = restoredSelectionLocator(pending);
@@ -2322,9 +2334,15 @@ export function DesignPanel({
                         if (pending) pending.frameLoaded = true;
                         if (activePageHash && !pending) frameWindow?.postMessage({ channel: DESIGN_MESSAGE_CHANNEL, type: "scroll-to", hash: activePageHash }, "*");
                         frameWindow?.postMessage({ channel: DESIGN_MESSAGE_CHANNEL, type: "set-editing", editing }, "*");
-                        const deckIndex = pending?.deckIndex ?? deckRef.current?.index;
+                        // Prefer an explicit view-restore, then the live deck page, then
+                        // the page we carried across a view switch (initialDeckPage).
+                        const carriedDeckPage = initialDeckPage !== undefined && !initialDeckPageAppliedRef.current && deckRef.current === null
+                          ? initialDeckPage
+                          : undefined;
+                        const deckIndex = pending?.deckIndex ?? deckRef.current?.index ?? carriedDeckPage;
                         if (deckIndex !== undefined && deckIndex !== null) {
                           frameWindow?.postMessage({ channel: DESIGN_MESSAGE_CHANNEL, type: "deck-navigate", direction: "index", index: deckIndex, viewRevision: pending?.id ?? "" }, "*");
+                          if (carriedDeckPage !== undefined) initialDeckPageAppliedRef.current = true;
                         }
                         if (pending) {
                           frameWindow?.postMessage({

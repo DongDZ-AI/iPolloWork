@@ -24,11 +24,27 @@ export function createDeepSeekDesignStudioClient(options: DeepSeekDesignStudioCl
     const iframeRef = React.useRef<HTMLIFrameElement>(null);
     const workspace = useWorkspaces((state) => state.items.find((item) => item.sessionIds.includes(sessionId)));
     const projectId = `${String(sessionId)}${options.projectSuffix ?? ""}`;
+    const pageKey = `ipollowork:${projectId}:lastPage`;
+    const [deckPage, setDeckPage] = React.useState<number | null>(() => {
+      const raw = window.sessionStorage.getItem(pageKey);
+      const value = raw === null ? NaN : Number(raw);
+      return Number.isInteger(value) && value >= 0 ? value : null;
+    });
 
     React.useEffect(() => {
       const receive = (event: MessageEvent) => {
         if (event.origin !== window.location.origin || event.source !== iframeRef.current?.contentWindow) return;
         if (!isDesignStudioHostMessage(event.data)) return;
+        if (event.data.type === "deck-changed") {
+          const page = event.data.page;
+          setDeckPage(page);
+          try {
+            window.sessionStorage.setItem(pageKey, String(page));
+          } catch {
+            // sessionStorage can be unavailable (e.g. in a sandboxed context); best-effort.
+          }
+          return;
+        }
         if (event.data.type === "ask-document-ai") {
           const _curPage = (event.data as { currentPage?: string }).currentPage || "";
           inputActions.setDraft([
@@ -45,7 +61,7 @@ export function createDeepSeekDesignStudioClient(options: DeepSeekDesignStudioCl
       };
       window.addEventListener("message", receive);
       return () => window.removeEventListener("message", receive);
-    }, [inputActions, projectId]);
+    }, [inputActions, projectId, pageKey]);
 
     if (!workspace) {
       return (
@@ -57,6 +73,7 @@ export function createDeepSeekDesignStudioClient(options: DeepSeekDesignStudioCl
     }
 
     const query = new URLSearchParams({ workspaceId: String(workspace.workspaceId), sessionId: String(sessionId) });
+    if (deckPage !== null) query.set("page", String(deckPage));
     return (
       <section style={shellStyle} aria-label={`iPolloWork ${options.studioTitle}`}>
         <iframe
