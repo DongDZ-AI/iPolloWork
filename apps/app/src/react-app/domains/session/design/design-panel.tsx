@@ -1001,11 +1001,13 @@ export function DesignPanel({
         if (!acceptsDesignDeckMessage(pending, { index: deckIndex, viewRevision: event.data.viewRevision })) return;
         deckRef.current = event.data.deck;
         setDeck(event.data.deck);
+        if (initialDeckPage !== undefined && deckIndex === initialDeckPage) initialDeckPageAppliedRef.current = true;
         // Report the active slide to the host so a subsequent view remount can
         // restore the same page when the studio iframe is rebuilt. While a
-        // carried initial page is still being restored, the deck reports the
-        // pre-navigation index; suppress that so we don't clobber the restore.
-        if (initialDeckPage === undefined || initialDeckPageAppliedRef.current) {
+        // carried initial page is still being restored, the deck first reports
+        // its pre-navigation index (0); suppress that so it doesn't overwrite
+        // the persisted page with 0.
+        if (initialDeckPage === undefined || initialDeckPageAppliedRef.current || deckIndex === initialDeckPage) {
           window.parent.postMessage({
             channel: DESIGN_STUDIO_HOST_CHANNEL,
             type: "deck-changed",
@@ -2338,15 +2340,17 @@ export function DesignPanel({
                         if (pending) pending.frameLoaded = true;
                         if (activePageHash && !pending) frameWindow?.postMessage({ channel: DESIGN_MESSAGE_CHANNEL, type: "scroll-to", hash: activePageHash }, "*");
                         frameWindow?.postMessage({ channel: DESIGN_MESSAGE_CHANNEL, type: "set-editing", editing }, "*");
-                        // Prefer an explicit view-restore, then the live deck page, then
-                        // the page we carried across a view switch (initialDeckPage).
-                        const carriedDeckPage = initialDeckPage !== undefined && !initialDeckPageAppliedRef.current && deckRef.current === null
-                          ? initialDeckPage
-                          : undefined;
-                        const deckIndex = pending?.deckIndex ?? deckRef.current?.index ?? carriedDeckPage;
-                        if (deckIndex !== undefined && deckIndex !== null) {
-                          frameWindow?.postMessage({ channel: DESIGN_MESSAGE_CHANNEL, type: "deck-navigate", direction: "index", index: deckIndex, viewRevision: pending?.id ?? "" }, "*");
-                          if (carriedDeckPage !== undefined) initialDeckPageAppliedRef.current = true;
+                        // If a page was carried across a view switch (initialDeckPage),
+                        // keep navigating to it until the deck actually reports reaching
+                        // it. The deck boots and reports 0 first, then the iframe may
+                        // reload during hydration; a one-shot guard loses the restore.
+                        // Only stop once deckRef matches the target page.
+                        const targetPage = pending?.deckIndex
+                          ?? (initialDeckPage !== undefined && deckRef.current?.index !== initialDeckPage
+                            ? initialDeckPage
+                            : undefined);
+                        if (targetPage !== undefined && targetPage !== null && targetPage !== deckRef.current?.index) {
+                          frameWindow?.postMessage({ channel: DESIGN_MESSAGE_CHANNEL, type: "deck-navigate", direction: "index", index: targetPage, viewRevision: pending?.id ?? "" }, "*");
                         }
                         if (pending) {
                           frameWindow?.postMessage({
