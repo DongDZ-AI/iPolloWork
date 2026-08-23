@@ -643,6 +643,7 @@ export function DesignPanel({
   }, [setHistory]);
   const [previewSource, setPreviewSource] = React.useState("");
   const [hydratedPreviewSource, setHydratedPreviewSource] = React.useState("");
+  const [hydrationReady, setHydrationReady] = React.useState(false);
   const [previewRevision, setPreviewRevision] = React.useState(0);
   const previewRevisionRef = React.useRef(previewRevision);
   previewRevisionRef.current = previewRevision;
@@ -967,11 +968,13 @@ export function DesignPanel({
   React.useEffect(() => {
     if (!previewSource) {
       setHydratedPreviewSource("");
+      setHydrationReady(false);
       return;
     }
     let cancelled = false;
     let objectUrls: string[] = [];
     setPreviewLoaded(false);
+    setHydrationReady(false);
     void hydrateDesignPreviewAssets(previewSource, { client, workspaceId, activePagePath }).then((result) => {
       objectUrls = result.objectUrls;
       if (cancelled) {
@@ -979,6 +982,7 @@ export function DesignPanel({
         return;
       }
       setHydratedPreviewSource(result.source);
+      setHydrationReady(true);
       setPreviewRevision((current) => current + 1);
     });
     return () => {
@@ -1967,8 +1971,16 @@ export function DesignPanel({
   const preview = React.useMemo(
     // The bridge is always present but starts inactive. Toggling editing is
     // a message to that bridge, not a new srcDoc, so a deck stays on its slide.
-    () => buildDesignPreviewDocument(hydratedPreviewSource || previewSource, true, designTokenDraft || templateTokenQuery.data || "", false, usesNativeEditablePptx, isPresentationTemplate, activeFrameRevision),
-    [activeFrameRevision, designTokenDraft, hydratedPreviewSource, isPresentationTemplate, previewSource, templateTokenQuery.data, usesNativeEditablePptx],
+    // Before asset hydration completes, render an empty document so the iframe
+    // does not fire relative src/href requests (e.g. assets/ipollowork-logo.svg)
+    // against the studio base and log 404s. Once hydrated, render the deck.
+    () => {
+      if (previewSource && !hydrationReady) {
+        return "<!doctype html><html><head></head><body></body></html>";
+      }
+      return buildDesignPreviewDocument(hydratedPreviewSource || previewSource, true, designTokenDraft || templateTokenQuery.data || "", false, usesNativeEditablePptx, isPresentationTemplate, activeFrameRevision);
+    },
+    [activeFrameRevision, designTokenDraft, hydratedPreviewSource, hydrationReady, isPresentationTemplate, previewSource, templateTokenQuery.data, usesNativeEditablePptx],
   );
   const selectionRect = selectionSummary?.selectionRect;
   const selectionLeft = isPresentationTemplate
