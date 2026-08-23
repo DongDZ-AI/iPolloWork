@@ -1002,12 +1002,16 @@ export function DesignPanel({
         deckRef.current = event.data.deck;
         setDeck(event.data.deck);
         // Report the active slide to the host so a subsequent view remount can
-        // restore the same page when the studio iframe is rebuilt.
-        window.parent.postMessage({
-          channel: DESIGN_STUDIO_HOST_CHANNEL,
-          type: "deck-changed",
-          page: deckIndex,
-        }, window.location.origin);
+        // restore the same page when the studio iframe is rebuilt. While a
+        // carried initial page is still being restored, the deck reports the
+        // pre-navigation index; suppress that so we don't clobber the restore.
+        if (initialDeckPage === undefined || initialDeckPageAppliedRef.current) {
+          window.parent.postMessage({
+            channel: DESIGN_STUDIO_HOST_CHANNEL,
+            type: "deck-changed",
+            page: deckIndex,
+          }, window.location.origin);
+        }
         if (pending && pending.deckIndex === deckIndex) {
           pending.deckRestored = true;
           if (pending.frameRestored) {

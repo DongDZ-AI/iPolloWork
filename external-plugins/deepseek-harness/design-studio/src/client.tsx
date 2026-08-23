@@ -25,10 +25,27 @@ export function createDeepSeekDesignStudioClient(options: DeepSeekDesignStudioCl
     const workspace = useWorkspaces((state) => state.items.find((item) => item.sessionIds.includes(sessionId)));
     const projectId = `${String(sessionId)}${options.projectSuffix ?? ""}`;
     const pageKey = `ipollowork:${projectId}:lastPage`;
-    const [deckPage, setDeckPage] = React.useState<number | null>(() => {
-      const raw = window.sessionStorage.getItem(pageKey);
-      const value = raw === null ? NaN : Number(raw);
-      return Number.isInteger(value) && value >= 0 ? value : null;
+
+    // Read the last active slide once at mount so it can be restored when the
+    // studio iframe is (re)mounted after a view switch. Keep it in a ref, not
+    // state: changing it must NOT re-render the iframe (which would reload the
+    // deck and reset navigation). We only persist to sessionStorage here.
+    const lastPageRef = React.useRef<number | null>(null);
+    // The iframe src is intentionally stable across re-renders so flipping the
+    // deck never reloads the document. Compute it once at mount.
+    const [src] = React.useState(() => {
+      const query = new URLSearchParams({ workspaceId: "", sessionId: "" });
+      let restorable: number | null = null;
+      try {
+        const raw = window.sessionStorage.getItem(pageKey);
+        const value = raw === null ? NaN : Number(raw);
+        if (Number.isInteger(value) && value >= 0) restorable = value;
+      } catch {
+        // sessionStorage can be unavailable (e.g. in a sandboxed context).
+      }
+      lastPageRef.current = restorable;
+      if (restorable !== null) query.set("page", String(restorable));
+      return query;
     });
 
     React.useEffect(() => {
@@ -37,7 +54,7 @@ export function createDeepSeekDesignStudioClient(options: DeepSeekDesignStudioCl
         if (!isDesignStudioHostMessage(event.data)) return;
         if (event.data.type === "deck-changed") {
           const page = event.data.page;
-          setDeckPage(page);
+          lastPageRef.current = page;
           try {
             window.sessionStorage.setItem(pageKey, String(page));
           } catch {
@@ -73,7 +90,7 @@ export function createDeepSeekDesignStudioClient(options: DeepSeekDesignStudioCl
     }
 
     const query = new URLSearchParams({ workspaceId: String(workspace.workspaceId), sessionId: String(sessionId) });
-    if (deckPage !== null) query.set("page", String(deckPage));
+    for (const [key, value] of src.entries()) query.set(key, value);
     return (
       <section style={shellStyle} aria-label={`iPolloWork ${options.studioTitle}`}>
         <iframe
