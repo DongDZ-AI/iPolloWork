@@ -79,3 +79,6 @@ evals/results/
 .superpowers/
 # Local design-system experiments; keep out of commits for now.
 # /apps/app/src/react-app/domains/session/design/design-systems/
+
+# Local pack outputs for the deepseek-ippt plugin (profile depends on these)
+/artifacts/
