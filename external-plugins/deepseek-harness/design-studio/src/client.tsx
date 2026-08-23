@@ -31,10 +31,10 @@ export function createDeepSeekDesignStudioClient(options: DeepSeekDesignStudioCl
     // state: changing it must NOT re-render the iframe (which would reload the
     // deck and reset navigation). We only persist to sessionStorage here.
     const lastPageRef = React.useRef<number | null>(null);
-    // The iframe src is intentionally stable across re-renders so flipping the
-    // deck never reloads the document. Compute it once at mount.
-    const [src] = React.useState(() => {
-      const query = new URLSearchParams({ workspaceId: "", sessionId: "" });
+    // The restorable page is read once at mount. Storing it in state (rather
+    // than in the iframe src) keeps the src stable across deck navigation, so
+    // flipping slides never reloads the document.
+    const [initialPage] = React.useState<number | null>(() => {
       let restorable: number | null = null;
       try {
         const raw = window.sessionStorage.getItem(pageKey);
@@ -44,8 +44,7 @@ export function createDeepSeekDesignStudioClient(options: DeepSeekDesignStudioCl
         // sessionStorage can be unavailable (e.g. in a sandboxed context).
       }
       lastPageRef.current = restorable;
-      if (restorable !== null) query.set("page", String(restorable));
-      return query;
+      return restorable;
     });
 
     React.useEffect(() => {
@@ -90,7 +89,7 @@ export function createDeepSeekDesignStudioClient(options: DeepSeekDesignStudioCl
     }
 
     const query = new URLSearchParams({ workspaceId: String(workspace.workspaceId), sessionId: String(sessionId) });
-    for (const [key, value] of src.entries()) query.set(key, value);
+    if (initialPage !== null) query.set("page", String(initialPage));
     return (
       <section style={shellStyle} aria-label={`iPolloWork ${options.studioTitle}`}>
         <iframe
