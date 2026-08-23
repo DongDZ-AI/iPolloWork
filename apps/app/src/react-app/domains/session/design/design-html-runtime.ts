@@ -143,11 +143,23 @@ export function buildDesignPreviewDocument(
     ? `<script id="ipollowork-design-runtime">/* const elementLocator = (element: HTMLElement); const primaryAttribute = "data-ipollowork-design-primary"; let selectedElements: HTMLElement[] = []; let primaryElement: HTMLElement | null = null; const effectiveMode = selectedElements.length > 1 ? "move" : mode; const selectedTargets = (ids: unknown) => */(${designRuntime.toString()})(${JSON.stringify(DESIGN_MESSAGE_CHANNEL)},${JSON.stringify(DESIGN_STYLE_FIELDS)},${editing ? "true" : "false"},${fixedSlideStage ? "true" : "false"},${isPresentationTemplate ? "true" : "false"},${JSON.stringify(DESIGN_MULTI_SELECTION_STYLE_FIELDS)},${JSON.stringify(frameRevision)});<\/script>`
     : "";
   const runtime = `${tokenStyle}${navigationRuntime}${deckRuntime}${fixedSlideRuntime}${editingRuntime}`;
-  const bodyEnd = source.toLowerCase().lastIndexOf("</body>");
+  const tokenLinkStyleHref = `data:text/css;charset=utf-8,${encodeURIComponent(templateTokenCss.trim())}`;
+  const previewSource = source.replace(
+    /<link\b([^>]*\bdata-ipw-design-tokens\b[^>]*)>/gi,
+    (tag, linkAttributes: string) => {
+      const hrefMatch = linkAttributes.match(/\bhref=("([^"]*)"|'([^']*)')/i);
+      const originalHref = hrefMatch ? (hrefMatch[2] ?? hrefMatch[3]) : "";
+      const withoutHref = linkAttributes.replace(/\shref=("([^"]*)"|'([^']*)')/i, "");
+      let next = `${withoutHref} href="${tokenLinkStyleHref}"`;
+      if (originalHref) next = `${next} data-ipw-preview-href="${encodeURIComponent(originalHref)}"`;
+      return `<link${next}>`;
+    },
+  );
+  const bodyEnd = previewSource.toLowerCase().lastIndexOf("</body>");
   if (bodyEnd >= 0) {
-    return `${source.slice(0, bodyEnd)}${runtime}${source.slice(bodyEnd)}`;
+    return `${previewSource.slice(0, bodyEnd)}${runtime}${previewSource.slice(bodyEnd)}`;
   }
-  return `${source}${runtime}`;
+  return `${previewSource}${runtime}`;
 }
 
 function designFixedSlideRuntime() {
@@ -586,6 +598,17 @@ function designRuntime(channel: string, styleFields: readonly string[], initialE
       const original = element.getAttribute("data-ipw-preview-src") ?? "";
       if (original) element.setAttribute("src", original);
       element.removeAttribute("data-ipw-preview-src");
+    });
+    clone.querySelectorAll<HTMLLinkElement>("link[data-ipw-preview-href]").forEach((element) => {
+      const original = element.getAttribute("data-ipw-preview-href") ?? "";
+      if (original) {
+        try {
+          element.setAttribute("href", decodeURIComponent(original));
+        } catch {
+          element.setAttribute("href", original);
+        }
+      }
+      element.removeAttribute("data-ipw-preview-href");
     });
     clone.querySelectorAll(`[${editingAttribute}]`).forEach((element) => {
       element.removeAttribute(editingAttribute);

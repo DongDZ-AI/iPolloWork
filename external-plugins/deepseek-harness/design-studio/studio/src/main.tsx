@@ -47,9 +47,10 @@ function Studio() {
           byline: "by iPolloWork",
           bylineUrl: "https://github.com/Devin-AXIS/iPolloWork",
           repositoryUrl: "https://github.com/Devin-AXIS/deepseek-design",
-          onAskAi: () => window.parent.postMessage({
+          onAskAi: (currentPage?: string) => window.parent.postMessage({
             channel: DESIGN_STUDIO_HOST_CHANNEL,
             type: "ask-document-ai",
+            currentPage,
           }, window.location.origin),
         }}
         onAskAi={(context) => window.parent.postMessage({

@@ -30,9 +30,11 @@ export function createDeepSeekDesignStudioClient(options: DeepSeekDesignStudioCl
         if (event.origin !== window.location.origin || event.source !== iframeRef.current?.contentWindow) return;
         if (!isDesignStudioHostMessage(event.data)) return;
         if (event.data.type === "ask-document-ai") {
+          const _curPage = (event.data as { currentPage?: string }).currentPage || "";
           inputActions.setDraft([
             `Help me improve the current ${options.studioTitle} document.`,
             `Project: design/${projectId}`,
+            ...(_curPage ? [`当前页：${_curPage}`] : []),
             "Read manifest.json, then read its entry file and linked design-tokens.css before editing.",
             "Preserve the existing structure unless I request a redesign.",
             "My requested change:",

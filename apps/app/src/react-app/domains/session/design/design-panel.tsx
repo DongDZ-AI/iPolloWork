@@ -135,7 +135,7 @@ type DesignPanelProps = {
     byline: string;
     bylineUrl: string;
     repositoryUrl: string;
-    onAskAi: () => void;
+    onAskAi: (currentPage?: string) => void;
   };
   onAskAi: (context: DesignAiSelectionContext) => void;
   onSaveAsTemplate?: () => void;
@@ -604,6 +604,12 @@ export function DesignPanel({
   const [editing, setEditing] = React.useState(false);
   const [deck, setDeck] = React.useState<DesignDeckState | null>(null);
   const deckRef = React.useRef<DesignDeckState | null>(null);
+  const getCurrentDeckPage = () => {
+    const d = deckRef.current;
+    if (!d) return "";
+    const page = `第${(d.index ?? 0) + 1}/${d.total}页`;
+    return d.title ? `${page} · ${d.title}` : page;
+  };
   const frameViewRef = React.useRef({ scrollX: 0, scrollY: 0 });
   const pendingViewRestoreRef = React.useRef<DesignViewRestore | null>(null);
   const hydratedPageRef = React.useRef("");
@@ -2154,7 +2160,7 @@ export function DesignPanel({
                     variant="secondary"
                     size="sm"
                     className="h-8 shrink-0 gap-1.5 rounded-lg bg-foreground px-2.5 text-xs font-semibold text-background shadow-none hover:bg-foreground/90 hover:text-background"
-                    onClick={branding.onAskAi}
+                    onClick={() => branding.onAskAi(getCurrentDeckPage())}
                     aria-label="Ask AI about this document"
                     title="Ask AI"
                   >

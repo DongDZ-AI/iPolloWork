@@ -13,6 +13,7 @@ export type DesignStudioHostMessage =
   | {
     channel: typeof DESIGN_STUDIO_HOST_CHANNEL;
     type: "ask-document-ai";
+    currentPage?: string;
   };
 
 export function designStudioAskAiRequest(
