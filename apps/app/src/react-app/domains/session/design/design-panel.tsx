@@ -703,6 +703,12 @@ export function DesignPanel({
     setQuickEdit(null);
     setAdvancedOpen(false);
     setPreviewLoaded(false);
+    // A template switch replaces the deck content. initialDeckPage is only meant
+    // to restore the active slide across a *view switch* of the SAME file, so it
+    // must not re-navigate a freshly-loaded template to the previous template's
+    // page. Mark the carried page as consumed so the new deck stays on page 1.
+    initialDeckPageAppliedRef.current = true;
+    deckRef.current = null;
   }, [queryClient, sessionId, setHistory, workspaceId]);
 
   React.useEffect(() => {
@@ -2356,9 +2362,12 @@ export function DesignPanel({
                         // keep navigating to it until the deck actually reports reaching
                         // it. The deck boots and reports 0 first, then the iframe may
                         // reload during hydration; a one-shot guard loses the restore.
-                        // Only stop once deckRef matches the target page.
+                        // Only stop once deckRef matches the target page. A template
+                        // switch consumes the carried page (initialDeckPageAppliedRef),
+                        // so a freshly-loaded template is never re-navigated to the
+                        // previous template's page and always starts on page 1.
                         const targetPage = pending?.deckIndex
-                          ?? (initialDeckPage !== undefined && deckRef.current?.index !== initialDeckPage
+                          ?? (initialDeckPage !== undefined && !initialDeckPageAppliedRef.current && deckRef.current?.index !== initialDeckPage
                             ? initialDeckPage
                             : undefined);
                         if (targetPage !== undefined && targetPage !== null && targetPage !== deckRef.current?.index) {
