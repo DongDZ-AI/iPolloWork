@@ -385,13 +385,6 @@ function designDeckRuntime(channel: string, runtimeOwnsNavigation = false, frame
     if (typeof requestedIndex === "number") showFallback(requestedIndex);
   };
 
-  const isEditableTarget = (target: EventTarget | null) => target instanceof Element
-    && Boolean(target.closest("input,textarea,select,[contenteditable]"));
-  const keyboardDirection = (event: KeyboardEvent) => {
-    if (event.key === "ArrowRight" || event.key === "ArrowDown" || event.key === "PageDown" || event.key === " ") return "next";
-    if (event.key === "ArrowLeft" || event.key === "ArrowUp" || event.key === "PageUp") return "previous";
-    return null;
-  };
 
   setSlideVisibility(activeIndex());
 
@@ -405,15 +398,14 @@ function designDeckRuntime(channel: string, runtimeOwnsNavigation = false, frame
     }, 0);
   }, true);
   document.addEventListener("keydown", (event) => {
-    const direction = !event.defaultPrevented && !event.altKey && !event.ctrlKey && !event.metaKey && !isEditableTarget(event.target)
-      ? keyboardDirection(event)
-      : null;
-    if (direction) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      navigate(direction);
-      return;
-    }
+    // The host owns deck navigation (toolbar buttons + thumbnail rail via
+    // deck-navigate messages). Templates ship their own keydown handler that
+    // flips slides on space / arrow / page keys; block it here so keyboard
+    // input never flips a slide. We stop only propagation -- NOT the browser
+    // default -- so typing (space) and caret movement (arrows) still work
+    // while editing.
+    const navigationKeys = [" ", "ArrowRight", "ArrowLeft", "ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End"];
+    if (navigationKeys.includes(event.key)) event.stopImmediatePropagation();
     window.setTimeout(report, 0);
   }, true);
   document.addEventListener("scroll", () => window.setTimeout(report, 0), true);
