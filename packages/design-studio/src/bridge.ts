@@ -14,6 +14,7 @@ export type DesignStudioHostMessage =
     channel: typeof DESIGN_STUDIO_HOST_CHANNEL;
     type: "ask-document-ai";
     currentPage?: string;
+    mode?: "ask" | "review";
   }
   | {
     channel: typeof DESIGN_STUDIO_HOST_CHANNEL;

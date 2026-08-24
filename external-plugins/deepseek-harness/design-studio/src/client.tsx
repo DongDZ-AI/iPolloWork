@@ -63,6 +63,19 @@ export function createDeepSeekDesignStudioClient(options: DeepSeekDesignStudioCl
         }
         if (event.data.type === "ask-document-ai") {
           const _curPage = (event.data as { currentPage?: string }).currentPage || "";
+          const mode = (event.data as { mode?: "ask" | "review" }).mode || "ask";
+          if (mode === "review") {
+            inputActions.setDraft([
+              `Do a full global review of the ${options.studioTitle} document.`,
+              `Project: design/${projectId}`,
+              "Read manifest.json, then read its entry file and linked design-tokens.css completely.",
+              "Review ALL slides/views for: content accuracy and completeness, structural and pacing problems, visual/typographic consistency, copy errors or typos, and any violation of the design-tokens.css theme contract.",
+              "Output a findings list grouped by slide/view. For each finding give: severity (MUST_FIX or SUGGEST), the problem, and a concrete fix suggestion. Keep the existing structure unless a fix requires a deliberate redesign.",
+              "",
+              "My focus/priority:",
+            ].join("\n"));
+            return;
+          }
           inputActions.setDraft([
             `Help me improve the current ${options.studioTitle} document.`,
             `Project: design/${projectId}`,

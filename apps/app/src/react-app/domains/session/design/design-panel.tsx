@@ -1,7 +1,7 @@
 /** @jsxImportSource react */
 import * as React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Check, ChevronLeft, ChevronRight, Code2, Focus, Github, Layers3, Loader2, Minus, Monitor, MousePointer2, Palette, Plus, Presentation, Save, Share2, SlidersHorizontal, Smartphone, Sparkles, Undo2 } from "lucide-react";
+import { ArrowLeft, Check, ChevronLeft, ChevronRight, ChevronDown, Code2, Focus, Github, Layers3, ListChecks, Loader2, Minus, Monitor, MousePointer2, Palette, Plus, Presentation, Save, Share2, SlidersHorizontal, Smartphone, Sparkles, Undo2 } from "lucide-react";
 
 import {
   IPOLLOWORK_DESIGN_STUDIO_FEATURES,
@@ -13,6 +13,12 @@ import {
 import { pickLocalImageFile, readLocalImageAsDataUrl } from "@/app/lib/desktop";
 import { downloadBlobAsFile } from "@/app/lib/download";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -139,6 +145,7 @@ type DesignPanelProps = {
     bylineUrl: string;
     repositoryUrl: string;
     onAskAi: (currentPage?: string) => void;
+    onAskGlobalReview?: () => void;
   };
   onAskAi: (context: DesignAiSelectionContext) => void;
   onSaveAsTemplate?: () => void;
@@ -2220,17 +2227,37 @@ export function DesignPanel({
             <div className={cn("ml-auto flex shrink-0 items-center", isPresentationTemplate ? "order-3" : "order-2", compactToolbar ? "gap-1" : "gap-2")}>
               {branding ? (
                 <>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="h-8 shrink-0 gap-1.5 rounded-lg bg-foreground px-2.5 text-xs font-semibold text-background shadow-none hover:bg-foreground/90 hover:text-background"
-                    onClick={() => branding.onAskAi(getCurrentDeckPage())}
-                    aria-label="Ask AI about this document"
-                    title="Ask AI"
-                  >
-                    <Sparkles className="size-4" />
-                    <span className={cn(compactToolbar && "sr-only")}>Ask AI</span>
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger
+                      render={(
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="h-8 shrink-0 gap-1.5 rounded-lg bg-foreground px-2.5 text-xs font-semibold text-background shadow-none hover:bg-foreground/90 hover:text-background"
+                          aria-label="Ask AI about this document"
+                          title="Ask AI"
+                        >
+                          <Sparkles className="size-4" />
+                          <span className={cn(compactToolbar && "sr-only")}>Ask AI</span>
+                          <ChevronDown className="size-3.5" />
+                        </Button>
+                      )}
+                    />
+                    <DropdownMenuContent align="end" className="w-52">
+                      <DropdownMenuItem onClick={() => branding.onAskAi(getCurrentDeckPage())}>
+                        <Sparkles className="size-4" />
+                        Ask AI
+                        <span className="ml-auto text-[10px] text-muted-foreground">当前页</span>
+                      </DropdownMenuItem>
+                      {branding.onAskGlobalReview ? (
+                        <DropdownMenuItem onClick={() => branding.onAskGlobalReview?.()}>
+                          <ListChecks className="size-4" />
+                          全局审阅
+                          <span className="ml-auto text-[10px] text-muted-foreground">全部页</span>
+                        </DropdownMenuItem>
+                      ) : null}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                   {templateControl}
                   {editControl}
                 </>
