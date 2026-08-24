@@ -26,20 +26,23 @@ export function createDeepSeekDesignStudioClient(options: DeepSeekDesignStudioCl
     const projectId = `${String(sessionId)}${options.projectSuffix ?? ""}`;
     const pageKey = `ipollowork:${projectId}:lastPage`;
 
-    // Read the last active slide at render time so a view switch (which remounts
-    // this StudioView) restores the same page. We read sessionStorage directly on
-    // each render rather than caching it in useState: the deck-changed messages
-    // that update sessionStorage do NOT re-render this component, so the iframe
-    // src stays stable while flipping slides (no reload); only a genuine remount
-    // (view switch) re-reads the value and restores the page.
-    let initialPage: number | null = null;
-    try {
-      const raw = window.sessionStorage.getItem(pageKey);
-      const value = raw === null ? NaN : Number(raw);
-      if (Number.isInteger(value) && value >= 0) initialPage = value;
-    } catch {
-      // sessionStorage can be unavailable (e.g. in a sandboxed context).
-    }
+    // Restore the last active slide on a genuine remount (view switch) so the
+    // same page reappears. We read sessionStorage ONCE via a lazy useState (not
+    // on every render): re-renders of this component must not re-read the value,
+    // because a deck-changed on slide navigation updates sessionStorage and would
+    // otherwise change the iframe src and reload the whole Studio (a visible
+    // flash of the panel). Caching it keeps the src stable while flipping slides;
+    // only a genuine remount re-initializes the lazy state and restores the page.
+    const [initialPage] = React.useState<number | null>(() => {
+      try {
+        const raw = window.sessionStorage.getItem(pageKey);
+        const value = raw === null ? NaN : Number(raw);
+        if (Number.isInteger(value) && value >= 0) return value;
+      } catch {
+        // sessionStorage can be unavailable (e.g. in a sandboxed context).
+      }
+      return null;
+    });
 
     React.useEffect(() => {
       const receive = (event: MessageEvent) => {
