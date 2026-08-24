@@ -162,6 +162,23 @@ export function buildDesignPreviewDocument(
   return `${previewSource}${runtime}`;
 }
 
+// Build a non-interactive, single-slide thumbnail document reused by the deck
+// thumbnail rail. It reuses the SAME deck document builder as the main
+// preview (buildDesignPreviewDocument), so a thumbnail renders a slide
+// exactly like the deck does -- no hand-rolled visibility CSS that can
+// mismatch a template's own slide layout. The deck runtime starts at slide 0,
+// and the rail posts a deck-navigate index message to the iframe to show the
+// target slide. The frameRevision is embedded so deck reports from this
+// thumbnail iframe are namespaced and cannot confuse the host.
+export function buildDeckThumbnailDocument(
+  source: string,
+  templateTokenCss = "",
+  frameRevision = "",
+) {
+  return buildDesignPreviewDocument(source, false, templateTokenCss, false, false, true, frameRevision);
+}
+
+
 function designFixedSlideRuntime() {
   const stage = document.querySelector<HTMLElement>("[data-ipw-template-kind='slides'],.deck");
   if (!stage) return;

@@ -26,6 +26,7 @@ import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { toast } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
+import { DeckThumbnailRail } from "./design-thumbnail-rail";
 import { isPptxCompatibleTemplate, type TemplateSessionSnapshot } from "@ipollowork/types/templates";
 import { ConfirmModal } from "@/react-app/design-system/modals/confirm-modal";
 import { useDesignAiSelectionStore } from "./design-ai-selection-store";
@@ -1122,6 +1123,19 @@ export function DesignPanel({
       direction,
     }, "*");
   }, [deck]);
+
+  const jumpToDeckPage = React.useCallback((index: number) => {
+    setSelectionState(null);
+    setQuickEdit(null);
+    setAdvancedOpen(false);
+    iframeRef.current?.contentWindow?.postMessage({
+      channel: DESIGN_MESSAGE_CHANNEL,
+      type: "deck-navigate",
+      direction: "index",
+      index,
+      viewRevision: "",
+    }, "*");
+  }, []);
 
   const readLatestCanvasHtml = React.useCallback(async () => {
     const frameWindow = iframeRef.current?.contentWindow;
@@ -2313,6 +2327,16 @@ export function DesignPanel({
             <div className="p-4 text-sm text-destructive">{fileQuery.error.message}</div>
           ) : (
             <div className="relative flex min-h-0 flex-1 overflow-hidden">
+              {isPresentationTemplate && deck && deck.total > 0 && hydrationReady ? (
+                <DeckThumbnailRail
+                  deckIndex={deck.index}
+                  deckTotal={deck.total}
+                  source={hydratedPreviewSource || previewSource}
+                  templateTokenCss={designTokenDraft || templateTokenQuery.data || ""}
+                  frameRevision={activeFrameRevision}
+                  onJump={jumpToDeckPage}
+                />
+              ) : null}
               <div
                 ref={previewViewportRef}
                 className={cn("relative min-w-0 flex-1 overflow-hidden bg-muted/30 p-2", !isPresentationTemplate && previewDevice === "mobile" && "flex justify-center bg-muted/50 px-4 py-3")}
