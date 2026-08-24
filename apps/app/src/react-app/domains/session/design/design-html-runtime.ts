@@ -415,6 +415,15 @@ function designDeckRuntime(channel: string, runtimeOwnsNavigation = false, frame
   document.addEventListener("click", (event) => {
     const isDeckControl = event.target instanceof Element
       && Boolean(event.target.closest("[data-ipw-deck-control],[data-action='prev'],[data-action='previous'],[data-action='next'],button[aria-label^='Go to slide']"));
+    // The host owns deck navigation. Templates ship standalone click handlers
+    // that flip slides (e.g. .brand-book click => show(i + 1)); stop only the
+    // propagation so that click never advances a slide while editing, while the
+    // deck runtime still reports the current page below. We deliberately do NOT
+    // use stopImmediatePropagation: the designRuntime's own document click
+    // listener (registered after this one) must keep running to select elements,
+    // and click-based text caret/focus is driven by pointerdown/mousedown which
+    // this handler does not touch.
+    if (!isDeckControl) event.stopPropagation();
     window.setTimeout(() => {
       setSlideVisibility(activeIndex());
       if (isDeckControl) notifyNavigation();
