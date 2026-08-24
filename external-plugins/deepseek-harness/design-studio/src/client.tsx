@@ -73,6 +73,20 @@ export function createDeepSeekDesignStudioClient(options: DeepSeekDesignStudioCl
           ].join("\n"));
           return;
         }
+        if (event.data.type === "ask-page-ai") {
+          const pageIndex = event.data.pageIndex;
+          const pageTitle = (event.data as { pageTitle?: string }).pageTitle || "";
+          const pageLabel = pageTitle ? `第 ${pageIndex + 1} 页：${pageTitle}` : `第 ${pageIndex + 1} 页`;
+          inputActions.setDraft([
+            `Help me improve a single slide of the ${options.studioTitle} document.`,
+            `Project: design/${projectId}`,
+            `Focus page: ${pageLabel}`,
+            "Read manifest.json, then read its entry file and linked design-tokens.css before editing.",
+            "Scope your suggestions ONLY to that slide. Preserve the existing structure and the linked design-tokens.css theme contract unless I request a redesign.",
+            "My requested change:",
+          ].join("\n"));
+          return;
+        }
         inputActions.setDraft(designStudioAskAiPrompt(event.data.request));
       };
       window.addEventListener("message", receive);

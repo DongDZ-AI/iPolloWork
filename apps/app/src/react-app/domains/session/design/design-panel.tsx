@@ -1137,6 +1137,20 @@ export function DesignPanel({
     }, "*");
   }, []);
 
+  const askAboutDeckPage = React.useCallback((index: number) => {
+    setSelectionState(null);
+    setQuickEdit(null);
+    setAdvancedOpen(false);
+    const current = deckRef.current;
+    const pageTitle = current && current.index === index ? current.title : "";
+    window.parent.postMessage({
+      channel: DESIGN_STUDIO_HOST_CHANNEL,
+      type: "ask-page-ai",
+      pageIndex: index,
+      pageTitle,
+    }, window.location.origin);
+  }, []);
+
   const readLatestCanvasHtml = React.useCallback(async () => {
     const frameWindow = iframeRef.current?.contentWindow;
     if (!editing || !frameWindow) return draftRef.current;
@@ -2335,6 +2349,7 @@ export function DesignPanel({
                   templateTokenCss={designTokenDraft || templateTokenQuery.data || ""}
                   frameRevision={activeFrameRevision}
                   onJump={jumpToDeckPage}
+                  onAskAi={askAboutDeckPage}
                 />
               ) : null}
               <div

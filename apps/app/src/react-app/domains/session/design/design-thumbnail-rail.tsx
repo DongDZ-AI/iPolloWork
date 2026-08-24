@@ -1,5 +1,5 @@
 import * as React from "react";
-import { GripVertical, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { GripVertical, PanelLeftClose, PanelLeftOpen, Sparkles } from "lucide-react";
 import { DESIGN_MESSAGE_CHANNEL, buildDeckThumbnailDocument } from "./design-html-runtime";
 
 const THUMBNAIL_STAGE_WIDTH = 1600;
@@ -14,6 +14,7 @@ type DeckThumbnailRailProps = {
   templateTokenCss: string;
   frameRevision: string;
   onJump: (index: number) => void;
+  onAskAi: (index: number) => void;
 };
 
 // A left rail that lists a 16:9 thumbnail for every slide of the deck. Each
@@ -30,6 +31,7 @@ export function DeckThumbnailRail({
   templateTokenCss,
   frameRevision,
   onJump,
+  onAskAi,
 }: DeckThumbnailRailProps) {
   const [collapsed, setCollapsed] = React.useState(false);
   const [railWidth, setRailWidth] = React.useState(168);
@@ -108,10 +110,17 @@ export function DeckThumbnailRail({
         {Array.from({ length: deckTotal }).map((_, index) => {
           const isActive = index === activeIndex;
           return (
-            <button
+            <div
               key={index}
-              type="button"
+              role="button"
+              tabIndex={0}
               onClick={() => onJump(index)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  onJump(index);
+                }
+              }}
               className={cnThumb(
                 "group relative mb-2 block w-full overflow-hidden rounded-lg border transition-all",
                 isActive
@@ -147,10 +156,23 @@ export function DeckThumbnailRail({
                   }, "*");
                 }}
               />
-              <span className="absolute bottom-1 right-1 rounded-md bg-black/55 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-white">
+              <span className="pointer-events-none absolute bottom-1 right-1 rounded-md bg-black/55 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-white">
                 {index + 1}
               </span>
-            </button>
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  event.preventDefault();
+                  onAskAi(index);
+                }}
+                className="absolute right-1 top-1 grid size-6 place-items-center rounded-md bg-black/55 text-white opacity-0 transition-opacity hover:bg-primary group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                title={`Ask AI about slide ${index + 1}`}
+                aria-label={`Ask AI about slide ${index + 1}`}
+              >
+                <Sparkles className="size-3.5" />
+              </button>
+            </div>
           );
         })}
       </div>
