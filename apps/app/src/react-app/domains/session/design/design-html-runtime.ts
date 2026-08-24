@@ -130,13 +130,14 @@ export function buildDesignPreviewDocument(
   fixedSlideStage = false,
   isPresentationTemplate = fixedSlideStage,
   frameRevision = "",
+  initialDeckIndex = 0,
 ) {
   const tokenStyle = templateTokenCss.trim()
     ? `<style id="ipollowork-design-template-token-style">${templateTokenCss.replace(/<\/style/gi, "<\\/style")}</style>`
     : "";
   const navigationRuntime = `<script id="ipollowork-design-navigation-runtime">(${designNavigationRuntime.toString()})(${JSON.stringify(DESIGN_MESSAGE_CHANNEL)},${editing ? "true" : "false"},${JSON.stringify(frameRevision)});<\/script>`;
   const deckRuntime = isPresentationTemplate
-    ? `<script id="ipollowork-design-deck-runtime">(${designDeckRuntime.toString()})(${JSON.stringify(DESIGN_MESSAGE_CHANNEL)},${fixedSlideStage ? "true" : "false"},${JSON.stringify(frameRevision)});<\/script>`
+    ? `<script id="ipollowork-design-deck-runtime">(${designDeckRuntime.toString()})(${JSON.stringify(DESIGN_MESSAGE_CHANNEL)},${fixedSlideStage ? "true" : "false"},${JSON.stringify(frameRevision)},${JSON.stringify(initialDeckIndex)});<\/script>`
     : "";
   const fixedSlideRuntime = fixedSlideStage
     ? `<script id="ipollowork-design-fixed-slide-runtime">(${designFixedSlideRuntime.toString()})();<\/script>`
@@ -176,8 +177,9 @@ export function buildDeckThumbnailDocument(
   source: string,
   templateTokenCss = "",
   frameRevision = "",
+  initialIndex = 0,
 ) {
-  return buildDesignPreviewDocument(source, false, templateTokenCss, false, false, true, frameRevision);
+  return buildDesignPreviewDocument(source, false, templateTokenCss, false, false, true, frameRevision, initialIndex);
 }
 
 
@@ -289,7 +291,7 @@ function designNavigationRuntime(channel: string, editing: boolean, frameRevisio
   });
 }
 
-function designDeckRuntime(channel: string, runtimeOwnsNavigation = false, frameRevision = "") {
+function designDeckRuntime(channel: string, runtimeOwnsNavigation = false, frameRevision = "", initialIndex = 0) {
   const slideSelector = "[data-ipw-slide],section.slide,.slide,.slide-frame";
   const slides = Array.from(document.querySelectorAll<HTMLElement>(slideSelector))
     .filter((element, index, list) => list.indexOf(element) === index);
@@ -308,6 +310,8 @@ function designDeckRuntime(channel: string, runtimeOwnsNavigation = false, frame
   visibilityStyle.textContent = `
     [data-ipw-slide][aria-hidden="true"] { display: none !important; opacity: 0 !important; pointer-events: none !important; }
     [data-ipw-slide][aria-hidden="false"] { opacity: 1 !important; pointer-events: auto !important; }
+    .slide:not(.is-active):not(.active) { display: none !important; }
+    .slide.is-active, .slide.active { display: block !important; }
   `;
   document.head.appendChild(visibilityStyle);
 
@@ -406,6 +410,7 @@ function designDeckRuntime(channel: string, runtimeOwnsNavigation = false, frame
 
 
   setSlideVisibility(activeIndex());
+  if (initialIndex > 0) showFallback(initialIndex);
 
   document.addEventListener("click", (event) => {
     const isDeckControl = event.target instanceof Element

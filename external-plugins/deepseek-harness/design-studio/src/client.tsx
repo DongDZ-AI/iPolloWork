@@ -26,26 +26,20 @@ export function createDeepSeekDesignStudioClient(options: DeepSeekDesignStudioCl
     const projectId = `${String(sessionId)}${options.projectSuffix ?? ""}`;
     const pageKey = `ipollowork:${projectId}:lastPage`;
 
-    // Read the last active slide once at mount so it can be restored when the
-    // studio iframe is (re)mounted after a view switch. Keep it in a ref, not
-    // state: changing it must NOT re-render the iframe (which would reload the
-    // deck and reset navigation). We only persist to sessionStorage here.
-    const lastPageRef = React.useRef<number | null>(null);
-    // The restorable page is read once at mount. Storing it in state (rather
-    // than in the iframe src) keeps the src stable across deck navigation, so
-    // flipping slides never reloads the document.
-    const [initialPage] = React.useState<number | null>(() => {
-      let restorable: number | null = null;
-      try {
-        const raw = window.sessionStorage.getItem(pageKey);
-        const value = raw === null ? NaN : Number(raw);
-        if (Number.isInteger(value) && value >= 0) restorable = value;
-      } catch {
-        // sessionStorage can be unavailable (e.g. in a sandboxed context).
-      }
-      lastPageRef.current = restorable;
-      return restorable;
-    });
+    // Read the last active slide at render time so a view switch (which remounts
+    // this StudioView) restores the same page. We read sessionStorage directly on
+    // each render rather than caching it in useState: the deck-changed messages
+    // that update sessionStorage do NOT re-render this component, so the iframe
+    // src stays stable while flipping slides (no reload); only a genuine remount
+    // (view switch) re-reads the value and restores the page.
+    let initialPage: number | null = null;
+    try {
+      const raw = window.sessionStorage.getItem(pageKey);
+      const value = raw === null ? NaN : Number(raw);
+      if (Number.isInteger(value) && value >= 0) initialPage = value;
+    } catch {
+      // sessionStorage can be unavailable (e.g. in a sandboxed context).
+    }
 
     React.useEffect(() => {
       const receive = (event: MessageEvent) => {
@@ -53,7 +47,6 @@ export function createDeepSeekDesignStudioClient(options: DeepSeekDesignStudioCl
         if (!isDesignStudioHostMessage(event.data)) return;
         if (event.data.type === "deck-changed") {
           const page = event.data.page;
-          lastPageRef.current = page;
           try {
             window.sessionStorage.setItem(pageKey, String(page));
           } catch {

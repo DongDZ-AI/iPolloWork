@@ -135,7 +135,7 @@ export function DeckThumbnailRail({
               aria-current={isActive ? "true" : undefined}
             >
               <iframe
-                srcDoc={buildDeckThumbnailDocument(source, templateTokenCss, thumbFrameRevision)}
+                srcDoc={buildDeckThumbnailDocument(source, templateTokenCss, thumbFrameRevision, index)}
                 className="pointer-events-none select-none border-0"
                 style={{
                   width: THUMBNAIL_STAGE_WIDTH,

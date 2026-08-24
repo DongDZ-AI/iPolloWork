@@ -2046,9 +2046,9 @@ export function DesignPanel({
       if (previewSource && !hydrationReady) {
         return "<!doctype html><html><head></head><body></body></html>";
       }
-      return buildDesignPreviewDocument(hydratedPreviewSource || previewSource, true, designTokenDraft || templateTokenQuery.data || "", false, usesNativeEditablePptx, isPresentationTemplate, activeFrameRevision);
+      return buildDesignPreviewDocument(hydratedPreviewSource || previewSource, true, designTokenDraft || templateTokenQuery.data || "", false, usesNativeEditablePptx, isPresentationTemplate, activeFrameRevision, initialDeckPage ?? 0);
     },
-    [activeFrameRevision, designTokenDraft, hydratedPreviewSource, hydrationReady, isPresentationTemplate, previewSource, templateTokenQuery.data, usesNativeEditablePptx],
+    [activeFrameRevision, designTokenDraft, hydratedPreviewSource, hydrationReady, initialDeckPage, isPresentationTemplate, previewSource, templateTokenQuery.data, usesNativeEditablePptx],
   );
   const selectionRect = selectionSummary?.selectionRect;
   const selectionLeft = isPresentationTemplate
