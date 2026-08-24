@@ -90,6 +90,8 @@ export type DesignRuntimeMessage = DesignRuntimeMessageEnvelope & (
   | { type: "view-restored"; viewRevision: string }
   | { type: "zoom"; deltaY: number }
   | { type: "pan"; deltaX: number; deltaY: number }
+  | { type: "slide-op"; op: "copy" | "delete" | "move"; index: number; direction?: "up" | "down" }
+  | { type: "slide-op-result"; op: string; index: number; html: string; total: number }
 );
 
 export function isLocalHtmlPath(path: string) {
@@ -431,10 +433,79 @@ function designDeckRuntime(channel: string, runtimeOwnsNavigation = false, frame
     setSlideVisibility(activeIndex());
     report();
   }).observe(document.body, { subtree: true, attributes: true, attributeFilter: ["class", "aria-hidden"] });
+
+  const serializeDeckDocument = () => {
+    const clone = document.documentElement.cloneNode(true);
+    if (!(clone instanceof HTMLElement)) return "";
+    clone.querySelector("#ipollowork-design-deck-runtime")?.remove();
+    clone.querySelector("#ipollowork-design-deck-runtime-style")?.remove();
+    clone.querySelector("#ipollowork-design-navigation-runtime")?.remove();
+    clone.querySelector("#ipollowork-design-fixed-slide-runtime")?.remove();
+    clone.querySelector("#ipollowork-design-fixed-slide-runtime-style")?.remove();
+    clone.querySelector("#ipollowork-design-template-token-style")?.remove();
+    clone.querySelectorAll("[data-ipw-preview-src]").forEach((element) => {
+      const original = element.getAttribute("data-ipw-preview-src") ?? "";
+      if (original) element.setAttribute("src", original);
+      element.removeAttribute("data-ipw-preview-src");
+    });
+    clone.querySelectorAll("link[data-ipw-preview-href]").forEach((element) => {
+      const original = element.getAttribute("data-ipw-preview-href") ?? "";
+      if (original) {
+        try { element.setAttribute("href", decodeURIComponent(original)); } catch { element.setAttribute("href", original); }
+      }
+      element.removeAttribute("data-ipw-preview-href");
+    });
+    return `<!doctype html>${clone.outerHTML}`;
+  };
+
+  const applySlideOp = (op: "copy" | "delete" | "move", index: number, direction?: "up" | "down") => {
+    const current = Array.from(document.querySelectorAll<HTMLElement>(slideSelector))
+      .filter((element, i, list) => list.indexOf(element) === i);
+    if (!current.length) return;
+    const clamped = Math.max(0, Math.min(current.length - 1, index));
+    if (op === "delete") {
+      if (current.length <= 1) return;
+      current[clamped].remove();
+    } else if (op === "copy") {
+      const source = current[clamped];
+      const clone = source.cloneNode(true) as HTMLElement;
+      clone.classList.remove("is-active", "is-prev", "is-next");
+      clone.setAttribute("aria-hidden", "true");
+      source.insertAdjacentElement("afterend", clone);
+    } else if (op === "move") {
+      const targetIndex = direction === "up" ? clamped - 1 : clamped + 1;
+      if (targetIndex < 0 || targetIndex > current.length - 1 || targetIndex === clamped) return;
+      const target = current[targetIndex];
+      const source = current[clamped];
+      if (direction === "up") target.insertAdjacentElement("beforebegin", source);
+      else target.insertAdjacentElement("afterend", source);
+    } else {
+      return;
+    }
+    const next = Array.from(document.querySelectorAll<HTMLElement>(slideSelector))
+      .filter((element, i, list) => list.indexOf(element) === i);
+    next.forEach((slide, slideIndex) => { slide.setAttribute("data-ipw-slide", String(slideIndex + 1)); });
+    const active = Math.max(0, Math.min(next.length - 1, clamped));
+    next.forEach((slide, slideIndex) => {
+      const isActive = slideIndex === active;
+      slide.classList.toggle("is-active", isActive);
+      slide.classList.remove("is-prev", "is-next");
+      slide.setAttribute("aria-hidden", String(!isActive));
+    });
+    notifyNavigation();
+    window.setTimeout(report, 0);
+    window.parent.postMessage({ channel, frameRevision, type: "slide-op-result", op, index: active, html: serializeDeckDocument(), total: next.length }, "*");
+  };
+
   window.addEventListener("message", (event) => {
     if (event.source !== window.parent) return;
     const data = event.data;
-    if (!data || typeof data !== "object" || data.channel !== channel || data.type !== "deck-navigate") return;
+    if (!data || typeof data !== "object" || data.channel !== channel) return;
+    if (data.type === "slide-op" && (data.op === "copy" || data.op === "delete" || data.op === "move")) {
+      applySlideOp(data.op, data.index, data.direction);
+      return;
+    }
+    if (data.type !== "deck-navigate") return;
     if (data.direction === "previous" || data.direction === "next") navigate(data.direction);
     else if (data.direction === "index" && typeof data.index === "number") {
       navigate("index", data.index);

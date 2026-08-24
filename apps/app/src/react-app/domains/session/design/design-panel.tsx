@@ -174,7 +174,7 @@ function isDesignRuntimeMessage(value: unknown): value is DesignRuntimeMessage {
     return isDesignSelectionMember(Reflect.get(value, "selection"))
       && (type !== "draft" || typeof Reflect.get(value, "html") === "string");
   }
-  return type === "deselected" || type === "document-draft" || type === "snapshot" || type === "navigate" || type === "deck" || type === "view" || type === "view-restored" || type === "zoom" || type === "pan";
+  return type === "deselected" || type === "document-draft" || type === "snapshot" || type === "navigate" || type === "deck" || type === "view" || type === "view-restored" || type === "zoom" || type === "pan" || type === "slide-op-result";
 }
 
 function fileName(path: string) {
@@ -1075,6 +1075,20 @@ export function DesignPanel({
         return;
       }
       if ((event.data.type === "draft" || event.data.type === "document-draft") && shouldIgnoreDesignDraftMessage(pendingViewRestoreRef.current)) return;
+      if (event.data.type === "slide-op-result") {
+        draftRef.current = event.data.html;
+        setDraft(event.data.html);
+        setPendingCanvasChange(false);
+        setDeck((current) => current ? { ...current, index: event.data.index, total: event.data.total } : current);
+        // Save the current iframe DOM (already reordered), then force a preview
+        // rebuild so the main preview and thumbnails reflect the new order.
+        void saveMutation.mutateAsync().then(() => {
+          setPreviewSource(event.data.html);
+          setHydratedPreviewSource("");
+          setPreviewRevision((current) => current + 1);
+        }).catch(() => undefined);
+        return;
+      }
       if (event.data.type === "document-draft") {
         draftRef.current = event.data.html;
         setDraft(event.data.html);
@@ -1141,6 +1155,19 @@ export function DesignPanel({
       direction: "index",
       index,
       viewRevision: "",
+    }, "*");
+  }, []);
+
+  const runDeckSlideOp = React.useCallback((index: number, op: "copy" | "delete" | "move", direction?: "up" | "down") => {
+    setSelectionState(null);
+    setQuickEdit(null);
+    setAdvancedOpen(false);
+    iframeRef.current?.contentWindow?.postMessage({
+      channel: DESIGN_MESSAGE_CHANNEL,
+      type: "slide-op",
+      op,
+      index,
+      direction,
     }, "*");
   }, []);
 
@@ -2377,6 +2404,7 @@ export function DesignPanel({
                   frameRevision={activeFrameRevision}
                   onJump={jumpToDeckPage}
                   onAskAi={askAboutDeckPage}
+                  onSlideOp={runDeckSlideOp}
                 />
               ) : null}
               <div

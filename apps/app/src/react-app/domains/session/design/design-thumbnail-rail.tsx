@@ -1,5 +1,5 @@
 import * as React from "react";
-import { GripVertical, PanelLeftClose, PanelLeftOpen, Sparkles } from "lucide-react";
+import { ArrowDown, ArrowUp, Copy, GripVertical, PanelLeftClose, PanelLeftOpen, Sparkles, Trash2 } from "lucide-react";
 import { DESIGN_MESSAGE_CHANNEL, buildDeckThumbnailDocument } from "./design-html-runtime";
 
 const THUMBNAIL_STAGE_WIDTH = 1600;
@@ -15,6 +15,7 @@ type DeckThumbnailRailProps = {
   frameRevision: string;
   onJump: (index: number) => void;
   onAskAi: (index: number) => void;
+  onSlideOp: (index: number, op: "copy" | "delete" | "move", direction?: "up" | "down") => void;
 };
 
 // A left rail that lists a 16:9 thumbnail for every slide of the deck. Each
@@ -32,6 +33,7 @@ export function DeckThumbnailRail({
   frameRevision,
   onJump,
   onAskAi,
+  onSlideOp,
 }: DeckThumbnailRailProps) {
   const [collapsed, setCollapsed] = React.useState(false);
   const [railWidth, setRailWidth] = React.useState(168);
@@ -172,6 +174,63 @@ export function DeckThumbnailRail({
               >
                 <Sparkles className="size-3.5" />
               </button>
+              <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-0.5 bg-gradient-to-t from-black/70 via-black/45 to-transparent px-1 pb-1 pt-4 opacity-0 transition-opacity group-hover:opacity-100">
+                <button
+                  type="button"
+                  disabled={index <= 0}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    event.preventDefault();
+                    onSlideOp(index, "move", "up");
+                  }}
+                  className="grid size-5 place-items-center rounded text-white disabled:cursor-not-allowed disabled:opacity-40 hover:bg-white/20"
+                  title={`Move slide ${index + 1} up`}
+                  aria-label={`Move slide ${index + 1} up`}
+                >
+                  <ArrowUp className="size-3.5" />
+                </button>
+                <button
+                  type="button"
+                  disabled={index >= deckTotal - 1}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    event.preventDefault();
+                    onSlideOp(index, "move", "down");
+                  }}
+                  className="grid size-5 place-items-center rounded text-white disabled:cursor-not-allowed disabled:opacity-40 hover:bg-white/20"
+                  title={`Move slide ${index + 1} down`}
+                  aria-label={`Move slide ${index + 1} down`}
+                >
+                  <ArrowDown className="size-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    event.preventDefault();
+                    onSlideOp(index, "copy");
+                  }}
+                  className="grid size-5 place-items-center rounded text-white hover:bg-white/20"
+                  title={`Duplicate slide ${index + 1}`}
+                  aria-label={`Duplicate slide ${index + 1}`}
+                >
+                  <Copy className="size-3.5" />
+                </button>
+                <button
+                  type="button"
+                  disabled={deckTotal <= 1}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    event.preventDefault();
+                    onSlideOp(index, "delete");
+                  }}
+                  className="grid size-5 place-items-center rounded text-white disabled:cursor-not-allowed disabled:opacity-40 hover:bg-red-500/80"
+                  title={`Delete slide ${index + 1}`}
+                  aria-label={`Delete slide ${index + 1}`}
+                >
+                  <Trash2 className="size-3.5" />
+                </button>
+              </div>
             </div>
           );
         })}
