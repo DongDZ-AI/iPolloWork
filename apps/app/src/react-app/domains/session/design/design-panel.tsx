@@ -233,14 +233,35 @@ type HydratedDesignPreview = {
   objectUrls: string[];
 };
 
-function arrayBufferToPreviewDataUrl(data: ArrayBuffer, contentType: string | null) {
+function arrayBufferToPreviewDataUrl(data: ArrayBuffer, contentType: string | null, assetPath = "") {
   const bytes = new Uint8Array(data);
   let binary = "";
   const chunkSize = 0x8000;
   for (let index = 0; index < bytes.length; index += chunkSize) {
     binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
   }
-  return `data:${contentType ?? "application/octet-stream"};base64,${btoa(binary)}`;
+  return `data:${previewAssetMimeType(contentType, assetPath)};base64,${btoa(binary)}`;
+}
+
+// The workspace file API may return a generic content-type (e.g. application/
+// octet-stream) for font files; @font-face rejects those, so infer a usable MIME
+// from the asset extension when the served type is not a font/type it accepts.
+function previewAssetMimeType(contentType: string | null, assetPath = ""): string {
+  if (contentType && !/application\/octet-stream|text\/plain/i.test(contentType)) return contentType;
+  const ext = (assetPath.split("?")[0] ?? "").split(".").pop()?.toLowerCase() ?? "";
+  switch (ext) {
+    case "woff2": return "font/woff2";
+    case "woff": return "font/woff";
+    case "ttf": return "font/ttf";
+    case "otf": return "font/otf";
+    case "eot": return "application/vnd.ms-fontobject";
+    case "svg": return "image/svg+xml";
+    case "png": return "image/png";
+    case "jpg": case "jpeg": return "image/jpeg";
+    case "webp": return "image/webp";
+    case "gif": return "image/gif";
+    default: return contentType ?? "application/octet-stream";
+  }
 }
 
 async function hydrateDesignPreviewAssets(
@@ -254,31 +275,72 @@ async function hydrateDesignPreviewAssets(
   const workspaceId = input.workspaceId;
   const parser = new DOMParser();
   const document = parser.parseFromString(source, "text/html");
-  const images = Array.from(document.querySelectorAll<HTMLImageElement>("img[src]"))
-    .filter((image) => isPreviewLocalAssetUrl(image.getAttribute("src") ?? ""));
-  if (!images.length) return { source, objectUrls: [] };
-
+  // Cache resolved assets across images and CSS url() so each file is downloaded once.
   const assetUrls = new Map<string, string>();
-  await Promise.all(images.map(async (image) => {
-    const original = image.getAttribute("src") ?? "";
-    const assetPath = resolvePreviewAssetPath(input.activePagePath, original);
+
+  const inlineAsset = async (asset: string): Promise<string | null> => {
+    if (!isPreviewLocalAssetUrl(asset)) return null;
+    const assetPath = resolvePreviewAssetPath(input.activePagePath, asset);
     const existing = assetUrls.get(assetPath);
-    if (existing) {
-      image.setAttribute("src", existing);
-      image.setAttribute("data-ipw-preview-src", original);
-      return;
-    }
+    if (existing) return existing;
     try {
       const downloaded = await client.downloadWorkspaceFile(workspaceId, assetPath);
-      const dataUrl = arrayBufferToPreviewDataUrl(downloaded.data, downloaded.contentType);
+      const dataUrl = arrayBufferToPreviewDataUrl(downloaded.data, downloaded.contentType, assetPath);
       assetUrls.set(assetPath, dataUrl);
-      image.setAttribute("src", dataUrl);
-      image.setAttribute("data-ipw-preview-src", original);
+      return dataUrl;
     } catch {
       // Leave the original relative URL in place so broken assets stay visible
       // as broken assets instead of hiding an underlying file issue.
+      return null;
+    }
+  };
+
+  // --- img[src] ---
+  const images = Array.from(document.querySelectorAll<HTMLImageElement>("img[src]"))
+    .filter((image) => isPreviewLocalAssetUrl(image.getAttribute("src") ?? ""));
+  await Promise.all(images.map(async (image) => {
+    const original = image.getAttribute("src") ?? "";
+    const dataUrl = await inlineAsset(original);
+    if (dataUrl) {
+      image.setAttribute("src", dataUrl);
+      image.setAttribute("data-ipw-preview-src", original);
     }
   }));
+
+  // --- url(...) inside <style> blocks and inline style attributes ---
+  // Covers @font-face src: url('assets/fonts/*.ttf') and background-image url(...)
+  // so fonts and CSS-referenced assets load in the srcdoc preview (which, with no
+  // <base>, would otherwise resolve these against the Studio's own assets path).
+  const hydrateCssText = async (cssText: string): Promise<string> => {
+    const matches = Array.from(cssText.matchAll(/url\(\s*(['"]?)([^'")\s]+)\1\s*\)/g));
+    if (!matches.length) return cssText;
+    const resolved = await Promise.all(matches.map((match) => inlineAsset(match[2])));
+    let out = "";
+    let last = 0;
+    matches.forEach((match, index) => {
+      const full = match[0];
+      out += cssText.slice(last, match.index);
+      out += resolved[index] ? `url("${resolved[index]}")` : full;
+      last = (match.index ?? 0) + full.length;
+    });
+    return out + cssText.slice(last);
+  };
+
+  const styleNodes = Array.from(document.querySelectorAll<HTMLStyleElement>("style"));
+  await Promise.all(styleNodes.map(async (node) => {
+    const current = node.textContent ?? "";
+    const next = await hydrateCssText(current);
+    if (next !== current) node.textContent = next;
+  }));
+
+  const styledElements = Array.from(document.querySelectorAll<HTMLElement>("[style]"));
+  for (const element of styledElements) {
+    const attr = element.getAttribute("style");
+    if (!attr || !attr.includes("url(")) continue;
+    const next = await hydrateCssText(attr);
+    if (next !== attr) element.setAttribute("style", next);
+  }
+
   const doctype = source.trimStart().toLowerCase().startsWith("<!doctype") ? "<!DOCTYPE html>\n" : "";
   return { source: `${doctype}${document.documentElement.outerHTML}`, objectUrls: [] };
 }
